@@ -1,0 +1,126 @@
+{
+  "title": "Ticklag: Market Data",
+  "uid": "ticklag-market",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Live price by symbol (1m avg)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, symbol AS metric, avg_price AS value FROM ticks_1m WHERE $__timeFilter(bucket) ORDER BY bucket",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Tick throughput (count/min by symbol)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, symbol AS metric, tick_count AS value FROM ticks_1m WHERE $__timeFilter(bucket) ORDER BY bucket",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Price anomalies (z>3) \u2014 last 15m",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT event_time AS time, symbol, price, zscore FROM ticks WHERE is_anomaly AND $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 100",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_TIMESCALEDB",
+        "type": "datasource",
+        "query": "postgres",
+        "current": {
+          "text": "TimescaleDB",
+          "value": "TimescaleDB"
+        }
+      },
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "Prometheus"
+        }
+      }
+    ]
+  },
+  "__inputs": []
+}

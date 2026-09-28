@@ -1,0 +1,22 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test deps
+        run: pip install pytest pyyaml
+      - name: Unit tests (generator + z-score math)
+        run: python -m pytest tests/ -v
+      - name: Validate compose + configs parse
+        run: |
+          python -c "import yaml; yaml.safe_load(open('docker-compose.yml'))"
+          python -c "import json; [json.load(open(f'grafana/dashboards/{f}')) for f in ['market_data.json','sensor_fleet.json','pipeline_health.json']]"

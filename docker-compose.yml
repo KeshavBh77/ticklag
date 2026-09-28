@@ -1,0 +1,129 @@
+# Ticklag full stack. `docker-compose up` brings up everything.
+# Put your free Finnhub key in .env (see .env.example) before starting.
+
+services:
+  # ---------- broker ----------
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+    ports:
+      - "9092:9092"
+      - "9644:9644"   # admin/metrics
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # topic creation runs once, then exits
+  redpanda-init:
+    image: redpandadata/redpanda:v24.2.7
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        rpk topic create stock-ticks -p 5 -r 1 --brokers redpanda:9092 || true
+        rpk topic create sensor-readings -p 5 -r 1 --brokers redpanda:9092 || true
+        rpk topic create stock-ticks-dlq -p 1 -r 1 --brokers redpanda:9092 || true
+    restart: "no"
+
+  # ---------- storage ----------
+  timescaledb:
+    image: timescale/timescaledb:2.16.1-pg16
+    environment:
+      POSTGRES_USER: ticklag
+      POSTGRES_PASSWORD: ticklag
+      POSTGRES_DB: ticklag
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - tsdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticklag"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------- producers ----------
+  iot-producer:
+    build: ./producers
+    command: ["python", "iot_producer.py"]
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+    environment:
+      REDPANDA_BROKER: redpanda:9092
+      EMIT_HZ: "10"   # the load generator overrides this
+    restart: unless-stopped
+
+  finnhub-producer:
+    build: ./producers
+    command: ["python", "finnhub_producer.py"]
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+    environment:
+      REDPANDA_BROKER: redpanda:9092
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+    restart: unless-stopped
+
+  # ---------- stream processor ----------
+  stream:
+    build: ./stream
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+      timescaledb:
+        condition: service_healthy
+    environment:
+      REDPANDA_BROKER: redpanda:9092
+      PG_DSN: postgresql://ticklag:ticklag@timescaledb:5432/ticklag
+      Z_THRESHOLD: "3.0"
+      BATCH_SIZE: "500"
+    ports:
+      - "8000:8000"   # prometheus metrics
+    restart: unless-stopped
+
+  # ---------- observability ----------
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  redpanda-exporter:
+    # Redpanda exposes Prometheus metrics natively on :9644/metrics --
+    # no separate exporter container needed. This alias documents that
+    # prometheus scrapes redpanda:9644 directly (see prometheus.yml).
+    image: redpandadata/redpanda:v24.2.7
+    command: ["-version"]
+    restart: "no"
+
+  grafana:
+    image: grafana/grafana-oss:11.2.0
+    depends_on:
+      - timescaledb
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  tsdata:

@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Stream processor custom metrics (events/sec, write latency, anomalies)
+  - job_name: ticklag-stream
+    static_configs:
+      - targets: ["stream:8000"]
+
+  # Redpanda native Prometheus metrics -- consumer lag, throughput,
+  # partition state all come from here on the admin port.
+  - job_name: redpanda
+    metrics_path: /public_metrics
+    static_configs:
+      - targets: ["redpanda:9644"]

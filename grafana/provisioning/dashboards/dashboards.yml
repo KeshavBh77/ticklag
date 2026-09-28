@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: ticklag
+    orgId: 1
+    folder: Ticklag
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 15
+    options:
+      path: /var/lib/grafana/dashboards

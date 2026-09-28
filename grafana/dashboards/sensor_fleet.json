@@ -1,0 +1,124 @@
+{
+  "title": "Ticklag: Sensor Fleet",
+  "uid": "ticklag-fleet",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Avg sensor value by machine & type (1m)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, machine_id || '/' || sensor_type AS metric, avg_value AS value FROM sensor_readings_1m WHERE $__timeFilter(bucket) ORDER BY bucket",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Anomaly count per machine (1m)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, machine_id AS metric, anomaly_count AS value FROM sensor_readings_1m WHERE $__timeFilter(bucket) ORDER BY bucket",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Recent sensor anomalies (z>3)",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT event_time AS time, machine_id, sensor_id, sensor_type, value, zscore FROM sensor_readings WHERE is_anomaly AND $__timeFilter(event_time) ORDER BY event_time DESC LIMIT 100",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_TIMESCALEDB}"
+          }
+        }
+      ],
+      "datasource": {
+        "type": "postgres",
+        "uid": "${DS_TIMESCALEDB}"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_TIMESCALEDB",
+        "type": "datasource",
+        "query": "postgres",
+        "current": {
+          "text": "TimescaleDB",
+          "value": "TimescaleDB"
+        }
+      },
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "Prometheus"
+        }
+      }
+    ]
+  },
+  "__inputs": []
+}
