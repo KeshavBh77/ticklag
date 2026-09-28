@@ -1,11 +1,12 @@
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "producers"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "stream"))
 
 import math
 import pytest
-    from iot_fleet import IoTFleet, sensor_type_for_index, MACHINES, SENSORS_PER_MACHINE
-    from windowing import RollingStats, zscore, is_anomaly, SlidingWindow, watermark_is_late
+from iot_fleet import IoTFleet, sensor_type_for_index, MACHINES, SENSORS_PER_MACHINE
+from windowing import RollingStats, zscore, is_anomaly, SlidingWindow, watermark_is_late
 
 
 # ---------- IoT generator ----------
